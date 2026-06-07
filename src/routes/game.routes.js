@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { getHistory, buscarPartida } from '../controllers/game.controller.js'; // Importamos la nueva función del controlador
+// CORRECCIÓN: Agregada obtenerEstadoSala al import destructuring
+import { getHistory, buscarPartida, obtenerEstadoSala } from '../controllers/game.controller.js'; 
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 
 const router = Router();
@@ -51,5 +52,30 @@ router.get('/history', authenticateToken, getHistory);
  * description: Error en el servidor de emparejamiento
  */
 router.post('/buscar', authenticateToken, buscarPartida);
+
+/**
+ * @swagger
+ * /api/game/sala/{id}:
+ * get:
+ * summary: Obtener el estado actual de una sala de juego específica
+ * tags: [Juego]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * description: ID único de la sala
+ * responses:
+ * 200:
+ * description: Datos de la sala obtenidos con éxito
+ * 404:
+ * description: Sala no encontrada
+ * 401:
+ * description: No autorizado
+ */
 router.get('/sala/:id', authenticateToken, obtenerEstadoSala);
+
 export default router;
