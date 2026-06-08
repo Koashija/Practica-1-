@@ -1,37 +1,19 @@
 import mongoose from 'mongoose';
 
-const gameSchema = new mongoose.Schema({
-  room: {
-    type: String,
-    required: true
-  },
-  players: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Hace referencia al modelo User.js de arriba
-    required: true
-  }],
-  board: {
-    type: [String],
-    default: Array(9).fill('') // Tablero vacío de 3x3 para el gato
-  },
-  turn: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true
-  },
+const GameSchema = new mongoose.Schema({
+  room: { type: mongoose.Schema.Types.ObjectId, ref: 'Sala', required: true },
+  players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  board: { type: [String], default: Array(9).fill('') },
+  turn: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  playerX: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  playerO: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  winner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   status: {
     type: String,
-    enum: ['playing', 'won', 'draw'],
+    enum: ['playing', 'won', 'draw', 'abandoned'],
     default: 'playing'
   },
-  winner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    default: null
-  }
-}, {
-  timestamps: true
+  createdAt: { type: Date, default: Date.now }
 });
 
-const Game = mongoose.model('Game', gameSchema);
-export default Game;
+export default mongoose.model('Game', GameSchema);
