@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import Game from '../models/Game.js'; // Importamos el modelo de juego para limpiar datos
 
 export const getProfile = async (req, res, next) => {
   try {
@@ -11,8 +12,19 @@ export const getProfile = async (req, res, next) => {
 export const updateProfile = async (req, res, next) => {
   const { username, email } = req.body;
   try {
-    const existing = await User.findOne({ $or: [{ username }, { email }], _id: { $ne: req.user.id } });
-    if (existing) return res.status(400).json({ error: "El nombre de usuario o email ya están en uso" });
+    // Validar que los campos existan
+    if (!username || !email) {
+      return res.status(400).json({ error: "Username y email son requeridos" });
+    }
+
+    const existing = await User.findOne({ 
+      $or: [{ username }, { email }], 
+      _id: { $ne: req.user.id } 
+    });
+    
+    if (existing) {
+      return res.status(400).json({ error: "El nombre de usuario o email ya están en uso" });
+    }
 
     const updatedUser = await User.findByIdAndUpdate(
       req.user.id,
@@ -26,7 +38,14 @@ export const updateProfile = async (req, res, next) => {
 
 export const deleteProfile = async (req, res, next) => {
   try {
-    await User.findByIdAndDelete(req.user.id);
-    res.json({ msg: "Cuenta eliminada correctamente" });
+    const userId = req.user.id;
+
+    // 1. Eliminamos las partidas asociadas al usuario para no dejar basura en BD
+    await Game.deleteMany({ players: userId });
+
+    // 2. Eliminamos al usuario
+    await User.findByIdAndDelete(userId);
+    
+    res.json({ msg: "Cuenta y datos asociados eliminados correctamente" });
   } catch (error) { next(error); }
 };
