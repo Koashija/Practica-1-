@@ -6,17 +6,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * tags:
- * name: Game
- * description: Endpoints de almacenamiento y consulta de estadísticas de partidas.
- */
-
-/**
- * @swagger
  * /api/game/save:
  * post:
  * summary: Registra y almacena el resultado de una nueva partida jugada
- * tags: [Game]
+ * tags:
+ * - Game
  * security:
  * - bearerAuth: []
  * requestBody:
@@ -47,7 +41,8 @@ router.post('/save', authMiddleware, saveGame);
  * /api/game/history:
  * get:
  * summary: Obtiene el listado completo e histórico cronológico de partidas del usuario
- * tags: [Game]
+ * tags:
+ * - Game
  * security:
  * - bearerAuth: []
  * responses:
@@ -63,7 +58,8 @@ router.get('/history', authMiddleware, getHistory);
  * /api/game/stats:
  * get:
  * summary: Obtiene un objeto acumulativo con los totales de victorias, derrotas, empates y partidas totales
- * tags: [Game]
+ * tags:
+ * - Game
  * security:
  * - bearerAuth: []
  * responses:

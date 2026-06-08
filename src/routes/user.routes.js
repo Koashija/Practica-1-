@@ -6,17 +6,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * tags:
- * name: Users
- * description: Endpoints de gestión de perfil de usuario autenticado.
- */
-
-/**
- * @swagger
  * /api/users/profile:
  * get:
  * summary: Obtiene los detalles completos del perfil del usuario autenticado
- * tags: [Users]
+ * tags:
+ * - Users
  * security:
  * - bearerAuth: []
  * responses:
@@ -26,15 +20,10 @@ const router = express.Router();
  * description: No autorizado, token faltante o inválido.
  * 404:
  * description: Usuario no encontrado en la base de datos.
- */
-router.get('/profile', authMiddleware, getProfile);
-
-/**
- * @swagger
- * /api/users/profile:
  * put:
  * summary: Actualiza los campos modificables del perfil de usuario
- * tags: [Users]
+ * tags:
+ * - Users
  * security:
  * - bearerAuth: []
  * requestBody:
@@ -61,6 +50,7 @@ router.get('/profile', authMiddleware, getProfile);
  * 401:
  * description: Token no provisto o no válido.
  */
+router.get('/profile', authMiddleware, getProfile);
 router.put('/profile', authMiddleware, updateProfile);
 
 export default router;

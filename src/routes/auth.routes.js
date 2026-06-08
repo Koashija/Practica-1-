@@ -6,17 +6,11 @@ const router = express.Router();
 
 /**
  * @swagger
- * tags:
- * name: Auth
- * description: Endpoints encargados de la autenticación de usuarios.
- */
-
-/**
- * @swagger
  * /api/auth/register:
  * post:
  * summary: Registra un nuevo usuario en la aplicación
- * tags: [Auth]
+ * tags:
+ * - Auth
  * requestBody:
  * required: true
  * content:
@@ -50,7 +44,8 @@ router.post('/register', registerValidator, register);
  * /api/auth/login:
  * post:
  * summary: Inicia sesión con una cuenta existente
- * tags: [Auth]
+ * tags:
+ * - Auth
  * requestBody:
  * required: true
  * content:
