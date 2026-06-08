@@ -1,137 +1,184 @@
 import Game from '../models/Game.js';
 import User from '../models/User.js';
-
-// Cola de jugadores esperando partida en memoria RAM
-let matchmakingQueue = [];
+import Sala from '../models/Sala.js'; // Importamos tu modelo de salas HTTP
 
 export const handleSocketConnections = (io) => {
   io.on('connection', (socket) => {
     console.log(`Usuario conectado al socket: ${socket.id}`);
 
-    // Evento: Un jugador busca partida online
+    // 1. EVENTO CRÍTICO: El cliente se une al cuarto usando el ID de la sala de MongoDB
+    socket.on('join_room_client', async (data) => {
+      const { roomId } = data;
+      socket.join(roomId);
+      console.log(`Socket ${socket.id} se unió exitosamente al cuarto: ${roomId}`);
+    });
+
+    // 2. EVENTO: Sincronización inicial al encontrar partida por HTTP
     socket.on('buscar_partida', async (data) => {
-      const { userId } = data;
+      const { roomId, userId } = data;
 
       try {
-        const user = await User.findById(userId);
-        if (!user) {
-          socket.emit('error_partida', { message: 'Usuario no encontrado' });
-          return;
-        }
+        // Guardamos el userId y roomId en la sesión del socket para usarlo al desconectar
+        socket.userId = userId;
+        socket.roomId = roomId;
 
-        // Evitar duplicados en la cola de espera
-        if (matchmakingQueue.some(player => player.userId === userId)) {
-          return;
-        }
+        socket.join(roomId);
 
-        // Agregar al jugador actual a la cola
-        matchmakingQueue.push({
-          userId: user._id.toString(),
-          username: user.username,
-          socketId: socket.id
-        });
+        // Verificar si ya existe el registro de la partida en MongoDB para no duplicar
+        let partida = await Game.findOne({ room: roomId });
 
-        console.log(`Jugador ${user.username} entró a la cola de espera.`);
+        if (!partida) {
+          const sala = await Sala.findById(roomId);
+          if (sala && sala.jugador1 && sala.jugador2) {
+            // Creamos la partida oficial en la base de datos
+            partida = new Game({
+              room: roomId,
+              players: [sala.jugador1, sala.jugador2],
+              board: Array(9).fill(''),
+              turn: sala.jugador1, // Inicia el creador de la sala
+              status: 'playing'
+            });
+            await partida.save();
 
-        // Si hay al menos 2 jugadores, los emparejamos inmediatamente
-        if (matchmakingQueue.length >= 2) {
-          const jugador1 = matchmakingQueue.shift();
-          const jugador2 = matchmakingQueue.shift();
-
-          // Crear una sala única combinando los IDs de sus sockets
-          const roomId = `room_${jugador1.socketId}_${jugador2.socketId}`;
-
-          // Meter a ambos sockets a la sala privada
-          const socket1 = io.sockets.sockets.get(jugador1.socketId);
-          const socket2 = io.sockets.sockets.get(jugador2.socketId);
-
-          if (socket1) socket1.join(roomId);
-          if (socket2) socket2.join(roomId);
-
-          // Crear el registro de la partida inicial en MongoDB
-          const nuevaPartida = new Game({
-            room: roomId,
-            players: [jugador1.userId, jugador2.userId],
-            board: Array(9).fill(''),
-            turn: jugador1.userId, // Inicia el jugador 1
-            status: 'playing'
+            // Notificamos a la sala que la estructura de datos está lista
+            io.to(roomId).emit('turno_actualizado', {
+              board: partida.board,
+              turn: partida.turn
+            });
+          }
+        } else {
+          // Si ya existía, simplemente le mandamos el estado actual al jugador que se reconectó
+          socket.emit('turno_actualizado', {
+            board: partida.board,
+            turn: partida.turn
           });
-
-          await nuevaPartida.save();
-
-          // Notificar a ambos jugadores que la partida comenzó
-          io.to(roomId).emit('partida_iniciada', {
-            gameId: nuevaPartida._id,
-            roomId: roomId,
-            players: {
-              X: jugador1,
-              O: jugador2
-            },
-            turn: jugador1.userId
-          });
-
-          console.log(`Partida creada con éxito en la sala: ${roomId}`);
         }
       } catch (error) {
-        console.error('Error en el matchmaking por sockets:', error);
-        socket.emit('error_partida', { message: 'Hubo un error en el servidor.' });
+        console.error('Error al iniciar/vincular partida en sockets:', error);
       }
     });
 
-    // Evento: Un jugador realiza un movimiento en el tablero
-    socket.on('realizar_movimiento', async (data) => {
-      const { gameId, roomId, index, symbol, nextTurnUserId } = data;
+    // 3. EVENTO: Un jugador realiza un movimiento (Sincronizado con useGameLogic.ts)
+    socket.on('movimiento', async (data) => {
+      const { roomId, index, playerSymbol } = data;
 
       try {
-        const game = await Game.findById(gameId);
-        if (!game || game.status !== 'playing') return;
+        // Buscamos la partida activa en la base de datos
+        const game = await Game.findOne({ room: roomId, status: 'playing' });
+        if (!game) return;
 
-        // Actualizar el estado del tablero en la base de datos
-        game.board[index] = symbol;
-        game.turn = nextTurnUserId;
+        // Determinamos quién es el jugador rival para heredarle el turno
+        const rivalId = game.players.find(id => id.toString() !== game.turn.toString());
+
+        // Actualizamos el tablero en memoria de MongoDB
+        game.board[index] = playerSymbol;
+        
+        // Comprobamos de manera interna si hay un ganador o un empate
+        const ganadorSimbolo = checkWinnerStatus(game.board);
+        
+        if (ganadorSimbolo) {
+          game.status = 'won';
+          game.winner = game.turn; // El jugador que acaba de tirar es el ganador
+          await game.save();
+
+          // Sincronizamos las estadísticas incrementando juegos y victorias del ganador
+          await User.findByIdAndUpdate(game.turn, { 
+            $inc: { "stats.wins": 1, "stats.gamesPlayed": 1 } 
+          });
+          // Al perdedor le sumamos una derrota y juego jugado
+          await User.findByIdAndUpdate(rivalId, { 
+            $inc: { "stats.losses": 1, "stats.gamesPlayed": 1 } 
+          });
+
+          // Seteamos la sala HTTP como terminada
+          await Sala.findByIdAndUpdate(roomId, { estado: 'terminado' });
+
+          io.to(roomId).emit('turno_actualizado', { board: game.board, turn: '' });
+          io.to(roomId).emit('partida_finalizada', { winnerId: game.winner, isDraw: false });
+          return;
+        }
+
+        if (game.board.every(cell => cell !== '')) {
+          game.status = 'draw';
+          await game.save();
+
+          // Incrementamos empates a ambos jugadores
+          await User.updateMany({ _id: { $in: game.players } }, { 
+            $inc: { "stats.draws": 1, "stats.gamesPlayed": 1 } 
+          });
+
+          await Sala.findByIdAndUpdate(roomId, { estado: 'terminado' });
+
+          io.to(roomId).emit('turno_actualizado', { board: game.board, turn: '' });
+          io.to(roomId).emit('partida_finalizada', { winnerId: null, isDraw: true });
+          return;
+        }
+
+        // Si la partida continúa, cambiamos el turno al rival
+        game.turn = rivalId;
         await game.save();
 
-        // Reenviar el movimiento actualizado a todos los integrantes de la sala
-        io.to(roomId).emit('movimiento_actualizado', {
+        // Notificamos el cambio de turno exacto a ambos dispositivos
+        io.to(roomId).emit('turno_actualizado', {
           board: game.board,
           turn: game.turn
         });
+
       } catch (error) {
-        console.error('Error actualizando movimiento:', error);
+        console.error('Error procesando movimiento en socket:', error);
       }
     });
 
-    // Evento: Fin de la partida (Ganador o Empate)
-    socket.on('terminar_partida', async (data) => {
-      const { gameId, roomId, winnerId, status } = data;
-
-      try {
-        const game = await Game.findById(gameId);
-        if (!game) return;
-
-        game.status = status; // 'won' o 'draw'
-        if (winnerId) {
-          game.winner = winnerId;
-          // Sumar una victoria al contador del usuario en la BD
-          await User.findByIdAndUpdate(winnerId, { $inc: { wins: 1 } });
-        }
-        await game.save();
-
-        // Notificar los resultados finales a la sala
-        io.to(roomId).emit('partida_finalizada', {
-          status,
-          winner: winnerId
-        });
-      } catch (error) {
-        console.error('Error al finalizar la partida:', error);
-      }
-    });
-
-    // Evento: Desconexión del cliente
-    socket.on('disconnect', () => {
-      // Remover al jugador de la cola de espera si se desconecta antes de jugar
-      matchmakingQueue = matchmakingQueue.filter(player => player.socketId !== socket.id);
+    // 4. EVENTO: Cierre forzado de partida desde la interfaz o cierre de sesión
+    socket.on('disconnect', async () => {
       console.log(`Usuario desconectado de los sockets: ${socket.id}`);
+      
+      const { roomId, userId } = socket;
+
+      if (roomId && userId) {
+        try {
+          // Buscamos si había una partida activa en esa sala
+          const game = await Game.findOne({ room: roomId, status: 'playing' });
+          
+          if (game) {
+            game.status = 'abandoned';
+            // El ganador es el jugador que NO se desconectó
+            const rivalId = game.players.find(id => id.toString() !== userId.toString());
+            game.winner = rivalId;
+            await game.save();
+
+            // Actualizamos registros en la base de datos
+            if (rivalId) {
+              await User.findByIdAndUpdate(rivalId, { $inc: { "stats.wins": 1, "stats.gamesPlayed": 1 } });
+              await User.findByIdAndUpdate(userId, { $inc: { "stats.losses": 1, "stats.gamesPlayed": 1 } });
+            }
+
+            // Cambiamos el estado de la sala HTTP a terminado
+            await Sala.findByIdAndUpdate(roomId, { estado: 'terminado' });
+
+            // Avisamos al jugador remanente que el rival se fue
+            io.to(roomId).emit('jugador_desconectado');
+          }
+        } catch (error) {
+          console.error('Error al limpiar partida en desconexión:', error);
+        }
+      }
     });
   });
+};
+
+// Función auxiliar interna para validar victorias en el Servidor
+const checkWinnerStatus = (currentBoard) => {
+  const lines = [
+    [0, 1, 2], [3, 4, 5], [6, 7, 8], // Horizontales
+    [0, 3, 6], [1, 4, 7], [2, 5, 8], // Verticales
+    [0, 4, 8], [2, 4, 6]             // Diagonales
+  ];
+  for (const line of lines) {
+    const [a, b, c] = line;
+    if (currentBoard[a] && currentBoard[a] === currentBoard[b] && currentBoard[a] === currentBoard[c]) {
+      return currentBoard[a];
+    }
+  }
+  return null;
 };
