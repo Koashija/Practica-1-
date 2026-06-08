@@ -1,5 +1,4 @@
 import { Router } from 'express';
-// CORRECCIÓN: Agregada obtenerEstadoSala al import destructuring
 import { getHistory, buscarPartida, obtenerEstadoSala } from '../controllers/game.controller.js'; 
 import { authenticateToken } from '../middlewares/auth.middleware.js';
 
@@ -77,5 +76,48 @@ router.post('/buscar', authenticateToken, buscarPartida);
  * description: No autorizado
  */
 router.get('/sala/:id', authenticateToken, obtenerEstadoSala);
+
+/**
+ * @swagger
+ * /api/game/sala/{id}/terminar:
+ * post:
+ * summary: Finalizar y cerrar una sala por abandono o salida del jugador
+ * tags: [Juego]
+ * security:
+ * - bearerAuth: []
+ * parameters:
+ * - in: path
+ * name: id
+ * required: true
+ * schema:
+ * type: string
+ * description: ID de la sala que se desea destruir/finalizar
+ * responses:
+ * 200:
+ * description: Sala cerrada con éxito en MongoDB
+ * 500:
+ * description: Error al intentar cerrar la sala
+ * 401:
+ * description: No autorizado
+ */
+router.post('/sala/:id/terminar', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Importación dinámica local para no ensuciar los imports superiores
+    const Sala = (await import('../models/Sala.js')).default;
+    const Game = (await import('../models/Game.js')).default;
+
+    // Marcamos la sala HTTP como 'terminado' y el juego de sockets como 'abandoned'
+    await Sala.findByIdAndUpdate(id, { estado: 'terminado' });
+    await Game.findOneAndUpdate({ room: id }, { status: 'abandoned' });
+    
+    console.log(`[HTTP] Sala ${id} cerrada exitosamente desde el celular.`);
+    res.status(200).json({ msg: "Sala cerrada con éxito en MongoDB." });
+  } catch (error) {
+    console.error("Error al cerrar sala por HTTP:", error);
+    res.status(500).json({ error: "No se pudo cerrar la sala." });
+  }
+});
 
 export default router;
