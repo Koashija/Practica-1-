@@ -1,48 +1,54 @@
-import Game from '../models/Game.js';
-import User from '../models/User.js';
+const Game = require('../models/Game');
 
-/**
- * Obtener el historial de partidas del usuario autenticado
- */
-export const getHistory = async (req, res, next) => {
+// @desc    Save game result
+// @route   POST /api/game/save
+// @access  Private
+exports.saveGame = async (req, res, next) => {
   try {
-    const history = await Game.find({ players: req.user.id })
-      .populate('players', 'username email stats')
-      .sort({ createdAt: -1 });
-    res.status(200).json(history);
+    const { result } = req.body;
+    const userId = req.user.id;
+
+    const game = await Game.create({
+      userId,
+      result,
+    });
+
+    res.status(201).json(game);
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * Guardar resultado de partida local en el historial
- */
-export const guardarPartidaLocal = async (req, res, next) => {
+// @desc    Get game history
+// @route   GET /api/game/history
+// @access  Private
+exports.getHistory = async (req, res, next) => {
   try {
-    const { board, winner, status } = req.body; // status: 'won', 'draw'
+    const games = await Game.find({ userId: req.user.id }).sort({ playedAt: -1 });
+    res.json(games);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get game statistics
+// @route   GET /api/game/stats
+// @access  Private
+exports.getStats = async (req, res, next) => {
+  try {
     const userId = req.user.id;
 
-    // Crear registro de juego
-    const newGame = new Game({
-      players: [userId],
-      board: board,
-      status: status,
-      winner: winner === 'local' ? userId : null, // Ajusta según tu lógica
-      createdAt: new Date()
+    const victorias = await Game.countDocuments({ userId, result: 'victoria' });
+    const derrotas = await Game.countDocuments({ userId, result: 'derrota' });
+    const empates = await Game.countDocuments({ userId, result: 'empate' });
+    const totalPartidas = victorias + derrotas + empates;
+
+    res.json({
+      victorias,
+      derrotas,
+      empates,
+      totalPartidas,
     });
-    await newGame.save();
-
-    // Actualizar estadísticas del usuario
-    if (status === 'won') {
-      await User.findByIdAndUpdate(userId, { $inc: { 'stats.wins': 1, 'stats.gamesPlayed': 1 } });
-    } else if (status === 'draw') {
-      await User.findByIdAndUpdate(userId, { $inc: { 'stats.draws': 1, 'stats.gamesPlayed': 1 } });
-    } else {
-      await User.findByIdAndUpdate(userId, { $inc: { 'stats.losses': 1, 'stats.gamesPlayed': 1 } });
-    }
-
-    res.status(201).json({ msg: "Partida guardada con éxito" });
   } catch (error) {
     next(error);
   }

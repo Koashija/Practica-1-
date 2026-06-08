@@ -1,72 +1,73 @@
-import User from '../models/User.js';
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
+const User = require('../models/User');
+const jwt = require('jsonwebtoken');
 
-export const register = async (req, res) => {
+const generateToken = (id) => {
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+};
+
+// @desc    Register new user
+// @route   POST /api/auth/register
+// @access  Public
+exports.register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
-    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
-    
-    if (existingUser) {
-      return res.status(400).json({ message: 'El correo electrónico o nombre de usuario ya está registrado.' });
+
+    // Check if user exists
+    const userExists = await User.findOne({ $or: [{ email }, { username }] });
+    if (userExists) {
+      return res.status(400).json({
+        message: userExists.email === email ? 'Email already in use' : 'Username already taken',
+      });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
+    // Create user
+    const user = await User.create({
+      username,
+      email,
+      password,
+    });
 
-    const newUser = new User({ username, email, password: hashedPassword });
-    await newUser.save();
+    const token = generateToken(user._id);
 
     res.status(201).json({
-      message: 'Usuario registrado exitosamente',
-      user: { id: newUser._id, username: newUser.username, email: newUser.email }
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar,
+      token,
     });
   } catch (error) {
-    console.error("Error en register:", error);
-    res.status(500).json({ message: "Error interno del servidor al registrar" });
+    next(error);
   }
 };
 
-export const login = async (req, res) => {
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+exports.login = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
 
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
-      return res.status(401).json({ message: 'Credenciales incorrectas.' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch = await user.comparePassword(password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Credenciales incorrectas.' });
+      return res.status(401).json({ message: 'Invalid credentials' });
     }
 
-    const token = jwt.sign(
-      { id: user._id, username: user.username },
-      process.env.JWT_SECRET || 'fallback_secret',
-      { expiresIn: '7d' }
-    );
+    const token = generateToken(user._id);
 
-    res.status(200).json({
-      message: 'Inicio de sesión exitoso',
+    res.json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar,
       token,
-      user: { id: user._id, username: user.username, email: user.email, wins: user.stats.wins }
     });
   } catch (error) {
-    console.error("Error en login:", error);
-    res.status(500).json({ message: "Error interno del servidor" });
-  }
-};
-
-export const getProfile = async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id).select('-password');
-    if (!user) {
-      return res.status(404).json({ message: 'Usuario no encontrado.' });
-    }
-    res.status(200).json(user);
-  } catch (error) {
-    console.error("Error en getProfile:", error);
-    res.status(500).json({ message: "Error al obtener perfil" });
+    next(error);
   }
 };

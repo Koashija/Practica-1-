@@ -1,29 +1,15 @@
-import { Router } from 'express';
-import { getHistory, guardarPartidaLocal } from '../controllers/game.controller.js'; 
-import { authenticateToken } from '../middlewares/auth.middleware.js';
-
-const router = Router();
-
-/**
- * @swagger
- * /api/game/history:
- *   get:
- *     summary: Obtener el historial de partidas del usuario
- *     tags: [Juego]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Lista de partidas jugadas obtenida con éxito
- */
-router.get('/history', authenticateToken, getHistory);
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middlewares/auth.middleware');
+const { saveGame, getHistory, getStats } = require('../controllers/game.controller');
+const { validateSaveGame } = require('../validators/game.validator');
 
 /**
  * @swagger
- * /api/game/guardar:
+ * /api/game/save:
  *   post:
- *     summary: Guardar el resultado de una partida local
- *     tags: [Juego]
+ *     summary: Save game result
+ *     tags: [Game]
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -32,19 +18,56 @@ router.get('/history', authenticateToken, getHistory);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - result
  *             properties:
- *               board:
- *                 type: array
- *                 items:
- *                   type: string
- *               status:
+ *               result:
  *                 type: string
- *               winner:
- *                 type: string
+ *                 enum: [victoria, derrota, empate]
  *     responses:
  *       201:
- *         description: Partida guardada con éxito
+ *         description: Game saved
+ *       400:
+ *         description: Invalid result
  */
-router.post('/guardar', authenticateToken, guardarPartidaLocal);
+router.post('/save', protect, validateSaveGame, saveGame);
 
-export default router;
+/**
+ * @swagger
+ * /api/game/history:
+ *   get:
+ *     summary: Get user game history
+ *     tags: [Game]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of games
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Game'
+ */
+router.get('/history', protect, getHistory);
+
+/**
+ * @swagger
+ * /api/game/stats:
+ *   get:
+ *     summary: Get game statistics
+ *     tags: [Game]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Statistics
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Stats'
+ */
+router.get('/stats', protect, getStats);
+
+module.exports = router;

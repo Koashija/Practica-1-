@@ -1,0 +1,16 @@
+const { body, validationResult } = require('express-validator');
+
+const validateSaveGame = [
+  body('result')
+    .isIn(['victoria', 'derrota', 'empate'])
+    .withMessage('Result must be victoria, derrota or empate'),
+  (req, res, next) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+    next();
+  },
+];
+
+module.exports = { validateSaveGame };

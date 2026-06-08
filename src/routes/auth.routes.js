@@ -1,83 +1,65 @@
-import { Router } from 'express';
-import { register, login, getProfile } from '../controllers/auth.controller.js';
-import { registerValidator, loginValidator } from '../validators/auth.validator.js';
-import { authenticateToken } from '../middlewares/auth.middleware.js';
-
-const router = Router();
+const express = require('express');
+const router = express.Router();
+const { register, login } = require('../controllers/auth.controller');
+const { validateRegister, validateLogin } = require('../validators/auth.validator');
 
 /**
  * @swagger
  * /api/auth/register:
- * post:
- * summary: Registrar un nuevo usuario
- * tags: [Autenticación]
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * required:
- * - username
- * - email
- * - password
- * properties:
- * username:
- * type: string
- * email:
- * type: string
- * password:
- * type: string
- * responses:
- * 201:
- * description: Usuario creado con éxito
- * 400:
- * description: Error de validación o usuario ya existente
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - username
+ *               - email
+ *               - password
+ *             properties:
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User created
+ *       400:
+ *         description: Validation error or user exists
  */
-router.post('/register', registerValidator, register);
+router.post('/register', validateRegister, register);
 
 /**
  * @swagger
  * /api/auth/login:
- * post:
- * summary: Iniciar sesión de usuario
- * tags: [Autenticación]
- * requestBody:
- * required: true
- * content:
- * application/json:
- * schema:
- * type: object
- * required:
- * - email
- * - password
- * properties:
- * email:
- * type: string
- * password:
- * type: string
- * responses:
- * 200:
- * description: Login exitoso, devuelve el token JWT
- * 401:
- * description: Credenciales incorrectas
+ *   post:
+ *     summary: Login user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *             properties:
+ *               email:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ *       401:
+ *         description: Invalid credentials
  */
-router.post('/login', loginValidator, login);
+router.post('/login', validateLogin, login);
 
-/**
- * @swagger
- * /api/auth/profile:
- * get:
- * summary: Obtener el perfil del usuario autenticado
- * tags: [Autenticación]
- * security:
- * - bearerAuth: []
- * responses:
- * 200:
- * description: Datos del perfil obtenidos correctamente
- * 401:
- * description: Token inválido o no proporcionado
- */
-router.get('/profile', authenticateToken, getProfile);
-
-export default router;
+module.exports = router;

@@ -1,12 +1,13 @@
-// Archivo: C:\Users\sanch\Downloads\Vinicio\api\api\src\config\db.js
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-export const connectDB = async () => {
+const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGO_URI || '');
-    console.log(`MongoDB Atlas Conectado con éxito: ${conn.connection.host}`);
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('MongoDB Atlas connected successfully');
   } catch (error) {
-    console.error(`Error crítico en la conexión a la base de datos: ${error}`);
+    console.error('MongoDB connection error:', error);
     process.exit(1);
   }
 };
+
+module.exports = connectDB;

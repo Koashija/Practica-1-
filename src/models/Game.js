@@ -1,19 +1,25 @@
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-const GameSchema = new mongoose.Schema({
-  room: { type: mongoose.Schema.Types.ObjectId, ref: 'Sala', required: true },
-  players: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  board: { type: [String], default: Array(9).fill('') },
-  turn: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  playerX: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  playerO: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  winner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  status: {
-    type: String,
-    enum: ['playing', 'won', 'draw', 'abandoned'],
-    default: 'playing'
+const gameSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true,
+    },
+    result: {
+      type: String,
+      enum: ['victoria', 'derrota', 'empate'],
+      required: true,
+    },
+    playedAt: {
+      type: Date,
+      default: Date.now,
+    },
   },
-  createdAt: { type: Date, default: Date.now }
-});
+  {
+    timestamps: false,
+  }
+);
 
-export default mongoose.model('Game', GameSchema);
+module.exports = mongoose.model('Game', gameSchema);

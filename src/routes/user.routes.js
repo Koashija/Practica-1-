@@ -1,11 +1,55 @@
-import { Router } from 'express';
-import { getProfile, updateProfile, deleteProfile } from '../controllers/user.controller.js';
-import { authenticateToken } from '../middlewares/auth.middleware.js';
+const express = require('express');
+const router = express.Router();
+const { protect } = require('../middlewares/auth.middleware');
+const { getProfile, updateProfile } = require('../controllers/user.controller');
+const { validateUpdateProfile } = require('../validators/user.validator');
 
-const router = Router();
+/**
+ * @swagger
+ * /api/users/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Unauthorized
+ */
+router.get('/profile', protect, getProfile);
 
-router.get('/profile', authenticateToken, getProfile);
-router.put('/profile', authenticateToken, updateProfile);
-router.delete('/profile', authenticateToken, deleteProfile);
+/**
+ * @swagger
+ * /api/users/profile:
+ *   put:
+ *     summary: Update user profile
+ *     tags: [User]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               avatar:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Profile updated
+ *       400:
+ *         description: Validation error
+ */
+router.put('/profile', protect, validateUpdateProfile, updateProfile);
 
-export default router;
+module.exports = router;

@@ -1,31 +1,42 @@
-import express from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import dotenv from 'dotenv';
-import { connectDB } from './src/config/db.js'; 
-import authRoutes from './src/routes/auth.routes.js';
-import gameRoutes from './src/routes/game.routes.js';
-import userRoutes from './src/routes/user.routes.js'; // Nueva ruta
-import { errorHandler } from './src/middlewares/error.middleware.js';
+require('dotenv').config();
+const express = require('express');
+const cors = require('cors');
+const connectDB = require('./src/config/db');
+const swaggerDocs = require('./src/config/swagger');
+const errorMiddleware = require('./src/middlewares/error.middleware');
 
-dotenv.config();
+// Routes
+const authRoutes = require('./src/routes/auth.routes');
+const userRoutes = require('./src/routes/user.routes');
+const gameRoutes = require('./src/routes/game.routes');
+
 const app = express();
 
+// Connect to MongoDB
 connectDB();
 
-app.use(helmet({ contentSecurityPolicy: false }));
+// Middlewares
 app.use(cors());
-app.use(morgan('dev'));
 app.use(express.json());
 
-app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
+// Swagger
+swaggerDocs(app);
 
+// Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', userRoutes);
 app.use('/api/game', gameRoutes);
-app.use('/api/user', userRoutes); // Montaje
 
-app.use(errorHandler);
+// Health check
+app.get('/', (req, res) => {
+  res.json({ message: 'Tic Tac Toe API is running' });
+});
+
+// Error middleware (must be last)
+app.use(errorMiddleware);
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => console.log(`🚀 Servidor activo en puerto ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
+});

@@ -1,51 +1,60 @@
-import User from '../models/User.js';
-import Game from '../models/Game.js'; // Importamos el modelo de juego para limpiar datos
+const User = require('../models/User');
 
-export const getProfile = async (req, res, next) => {
+// @desc    Get user profile
+// @route   GET /api/users/profile
+// @access  Private
+exports.getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
-    if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
     res.json(user);
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
 
-export const updateProfile = async (req, res, next) => {
-  const { username, email } = req.body;
+// @desc    Update user profile
+// @route   PUT /api/users/profile
+// @access  Private
+exports.updateProfile = async (req, res, next) => {
   try {
-    // Validar que los campos existan
-    if (!username || !email) {
-      return res.status(400).json({ error: "Username y email son requeridos" });
+    const { username, email, avatar } = req.body;
+    const user = await User.findById(req.user.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
 
-    const existing = await User.findOne({ 
-      $or: [{ username }, { email }], 
-      _id: { $ne: req.user.id } 
+    // Check unique username/email if changed
+    if (username && username !== user.username) {
+      const existingUser = await User.findOne({ username });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username already taken' });
+      }
+      user.username = username;
+    }
+
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      user.email = email;
+    }
+
+    if (avatar) user.avatar = avatar;
+
+    await user.save();
+
+    res.json({
+      _id: user._id,
+      username: user.username,
+      email: user.email,
+      avatar: user.avatar,
     });
-    
-    if (existing) {
-      return res.status(400).json({ error: "El nombre de usuario o email ya están en uso" });
-    }
-
-    const updatedUser = await User.findByIdAndUpdate(
-      req.user.id,
-      { username, email },
-      { new: true }
-    ).select('-password');
-
-    res.json(updatedUser);
-  } catch (error) { next(error); }
-};
-
-export const deleteProfile = async (req, res, next) => {
-  try {
-    const userId = req.user.id;
-
-    // 1. Eliminamos las partidas asociadas al usuario para no dejar basura en BD
-    await Game.deleteMany({ players: userId });
-
-    // 2. Eliminamos al usuario
-    await User.findByIdAndDelete(userId);
-    
-    res.json({ msg: "Cuenta y datos asociados eliminados correctamente" });
-  } catch (error) { next(error); }
+  } catch (error) {
+    next(error);
+  }
 };
