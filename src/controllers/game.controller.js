@@ -1,12 +1,11 @@
 import Game from '../models/Game.js';
-import Sala from '../models/Sala.js'; // Importamos el nuevo modelo de la sala
+import Sala from '../models/Sala.js';
 
 // Obtener el historial de partidas del usuario
 export const getHistory = async (req, res, next) => {
   try {
-    // Buscar partidas donde participó el usuario autenticado
     const history = await Game.find({ players: req.user.id })
-      .populate('players', 'username email wins')
+      .populate('players', 'username email wins stats') // Traemos stats explícitamente
       .populate('winner', 'username')
       .sort({ createdAt: -1 });
 
@@ -21,7 +20,7 @@ export const buscarPartida = async (req, res, next) => {
   const { userId } = req.body;
 
   try {
-    // 1. Verificar si el usuario ya tiene una sala activa (que no haya terminado)
+    // 1. Verificar si el usuario ya tiene una sala activa
     let salaActiva = await Sala.findOne({ 
       $or: [{ jugador1: userId }, { jugador2: userId }], 
       estado: { $ne: 'terminado' } 
@@ -31,27 +30,27 @@ export const buscarPartida = async (req, res, next) => {
       return res.status(200).json({ msg: "Ya estás en una sala", sala: salaActiva });
     }
 
-    // 2. Buscar si hay alguna sala libre esperando a un segundo jugador (y que no sea del mismo usuario)
+    // 2. Buscar si hay alguna sala libre esperando
     let salaDisponible = await Sala.findOne({ estado: 'esperando', jugador1: { $ne: userId } });
 
     if (salaDisponible) {
-      // ¡Encontramos oponente! Nos unimos a su sala
       salaDisponible.jugador2 = userId;
       salaDisponible.estado = 'jugando';
       await salaDisponible.save();
 
       return res.status(200).json({ msg: "Oponente encontrado", sala: salaDisponible });
     } else {
-      // 3. No hay salas disponibles, creamos una nueva para que alguien más se una
+      // 3. Crear nueva sala
       const nuevaSala = new Sala({ jugador1: userId, estado: 'esperando' });
       await nuevaSala.save();
 
       return res.status(201).json({ msg: "Esperando oponente", sala: nuevaSala });
     }
   } catch (error) {
-    next(error); // Delega el error al middleware global de tu API
+    next(error);
   }
 };
+
 export const obtenerEstadoSala = async (req, res, next) => {
   try {
     const sala = await Sala.findById(req.params.id);
