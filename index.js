@@ -20,11 +20,22 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+// Configuración optimizada de Socket.IO para Render
 const io = new Server(server, {
   cors: {
     origin: '*',
-    methods: ['GET', 'POST']
-  }
+    methods: ['GET', 'POST'],
+    credentials: true
+  },
+  transports: ['polling', 'websocket'], // Polling primero como prioridad
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  connectTimeout: 30000,
+  // Importante para Render
+  allowUpgrades: true,
+  perMessageDeflate: false,
+  httpCompression: true
 });
 
 // Conexión a MongoDB Atlas
@@ -35,6 +46,15 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json());
+
+// Ruta de health check para Render
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'ok', 
+    message: 'Servidor funcionando correctamente',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Registro de rutas
 app.use('/api/auth', authRoutes);
@@ -48,7 +68,8 @@ handleSocketConnections(io);
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`Servidor de producción ejecutándose en el puerto ${PORT}`);
-  //console.log(`Documentación API disponible en http://localhost:${PORT}/docs`);
-}); 
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ Servidor ejecutándose en el puerto ${PORT}`);
+  console.log(`🔌 Socket.IO configurado con transports: polling, websocket`);
+  console.log(`📡 Health check disponible en: /health`);
+});
