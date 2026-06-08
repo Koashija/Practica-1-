@@ -1,71 +1,81 @@
-const User = require('../models/User');
-const jwt = require('jsonwebtoken');
+import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { validationResult } from 'express-validator';
 
-const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
-};
+export const register = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
 
-// @desc    Register new user
-// @route   POST /api/auth/register
-// @access  Public
-exports.register = async (req, res, next) => {
   try {
     const { username, email, password } = req.body;
 
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
+    let userExists = await User.findOne({ $or: [{ email }, { username }] });
     if (userExists) {
-      return res.status(400).json({
-        message: userExists.email === email ? 'Email already in use' : 'Username already taken',
-      });
+      return res.status(400).json({ message: 'El correo electrónico o nombre de usuario ya está registrado.' });
     }
 
-    // Create user
-    const user = await User.create({
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(username)}&background=random`;
+
+    const newUser = new User({
       username,
       email,
-      password,
+      password: hashedPassword,
+      avatar: defaultAvatar
     });
 
-    const token = generateToken(user._id);
+    await newUser.save();
 
-    res.status(201).json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
+    const token = jwt.sign({ id: newUser._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+
+    return res.status(201).json({
       token,
+      user: {
+        id: newUser._id,
+        username: newUser.username,
+        email: newUser.email,
+        avatar: newUser.avatar
+      }
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Login user
-// @route   POST /api/auth/login
-// @access  Public
-exports.login = async (req, res, next) => {
+export const login = async (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email }).select('+password');
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Credenciales inválidas. Comprueba tus datos.' });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ message: 'Invalid credentials' });
+      return res.status(400).json({ message: 'Credenciales inválidas. Comprueba tus datos.' });
     }
 
-    const token = generateToken(user._id);
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
+    return res.json({
       token,
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar
+      }
     });
   } catch (error) {
     next(error);

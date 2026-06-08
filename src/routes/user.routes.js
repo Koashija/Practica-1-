@@ -1,55 +1,66 @@
-const express = require('express');
+import express from 'express';
+import { getProfile, updateProfile } from '../controllers/user.controller.js';
+import authMiddleware from '../middlewares/auth.middleware.js';
+
 const router = express.Router();
-const { protect } = require('../middlewares/auth.middleware');
-const { getProfile, updateProfile } = require('../controllers/user.controller');
-const { validateUpdateProfile } = require('../validators/user.validator');
+
+/**
+ * @swagger
+ * tags:
+ * name: Users
+ * description: Endpoints de gestión de perfil de usuario autenticado.
+ */
 
 /**
  * @swagger
  * /api/users/profile:
- *   get:
- *     summary: Get user profile
- *     tags: [User]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: User profile
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/User'
- *       401:
- *         description: Unauthorized
+ * get:
+ * summary: Obtiene los detalles completos del perfil del usuario autenticado
+ * tags: [Users]
+ * security:
+ * - bearerAuth: []
+ * responses:
+ * 200:
+ * description: Datos devueltos satisfactoriamente.
+ * 401:
+ * description: No autorizado, token faltante o inválido.
+ * 404:
+ * description: Usuario no encontrado en la base de datos.
  */
-router.get('/profile', protect, getProfile);
+router.get('/profile', authMiddleware, getProfile);
 
 /**
  * @swagger
  * /api/users/profile:
- *   put:
- *     summary: Update user profile
- *     tags: [User]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               username:
- *                 type: string
- *               email:
- *                 type: string
- *               avatar:
- *                 type: string
- *     responses:
- *       200:
- *         description: Profile updated
- *       400:
- *         description: Validation error
+ * put:
+ * summary: Actualiza los campos modificables del perfil de usuario
+ * tags: [Users]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * username:
+ * type: string
+ * example: nuevo_nombre
+ * email:
+ * type: string
+ * example: nuevo_correo@example.com
+ * avatar:
+ * type: string
+ * example: https://ui-avatars.com/api/?name=Modificado
+ * responses:
+ * 200:
+ * description: Perfil actualizado correctamente.
+ * 400:
+ * description: El nombre de usuario o email ya se encuentra en uso por otra cuenta.
+ * 401:
+ * description: Token no provisto o no válido.
  */
-router.put('/profile', protect, validateUpdateProfile, updateProfile);
+router.put('/profile', authMiddleware, updateProfile);
 
-module.exports = router;
+export default router;

@@ -1,42 +1,39 @@
-require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./src/config/db');
-const swaggerDocs = require('./src/config/swagger');
-const errorMiddleware = require('./src/middlewares/error.middleware');
+import dotenv from 'dotenv';
+dotenv.config();
 
-// Routes
-const authRoutes = require('./src/routes/auth.routes');
-const userRoutes = require('./src/routes/user.routes');
-const gameRoutes = require('./src/routes/game.routes');
+import express from 'express';
+import cors from 'cors';
+import connectDB from './src/config/db.js';
+import swaggerDocs from './src/config/swagger.js';
+import errorMiddleware from './src/middlewares/error.middleware.js';
+
+// Importación de rutas (Obligatorio usar .js en ES Modules)
+import authRoutes from './src/routes/auth.routes.js';
+import userRoutes from './src/routes/user.routes.js';
+import gameRoutes from './src/routes/game.routes.js';
 
 const app = express();
 
-// Connect to MongoDB
-connectDB();
-
-// Middlewares
+// Middlewares globales externos
 app.use(cors());
 app.use(express.json());
 
-// Swagger
+// Conexión a la Base de Datos MongoDB Atlas
+connectDB();
+
+// Configuración de la documentación Swagger
 swaggerDocs(app);
 
-// Routes
+// Definición de las rutas del aplicativo
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/game', gameRoutes);
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({ message: 'Tic Tac Toe API is running' });
-});
-
-// Error middleware (must be last)
+// Middleware centralizado para el manejo de errores
 app.use(errorMiddleware);
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Swagger docs available at http://localhost:${PORT}/api-docs`);
+  console.log(`Servidor de la API corriendo correctamente en el puerto: ${PORT}`);
+  console.log(`Documentación de Swagger disponible en: http://localhost:${PORT}/api-docs`);
 });

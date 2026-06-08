@@ -1,18 +1,18 @@
-const swaggerJsdoc = require('swagger-jsdoc');
-const swaggerUi = require('swagger-ui-express');
+import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
 
 const options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Tic Tac Toe API',
+      title: 'Tic Tac Toe API REST',
       version: '1.0.0',
-      description: 'API for Tic Tac Toe game with authentication and statistics',
+      description: 'Documentación completa de la API para la aplicación de Tres en Raya móvil.',
     },
     servers: [
       {
-        url: 'http://localhost:5000',
-        description: 'Development server',
+        url: 'http://localhost:3000',
+        description: 'Servidor Local de Desarrollo',
       },
     ],
     components: {
@@ -21,49 +21,23 @@ const options = {
           type: 'http',
           scheme: 'bearer',
           bearerFormat: 'JWT',
-        },
-      },
-      schemas: {
-        User: {
-          type: 'object',
-          properties: {
-            _id: { type: 'string' },
-            username: { type: 'string' },
-            email: { type: 'string' },
-            avatar: { type: 'string' },
-            createdAt: { type: 'string', format: 'date-time' },
-          },
-        },
-        Game: {
-          type: 'object',
-          properties: {
-            _id: { type: 'string' },
-            userId: { type: 'string' },
-            result: { type: 'string', enum: ['victoria', 'derrota', 'empate'] },
-            playedAt: { type: 'string', format: 'date-time' },
-          },
-        },
-        Stats: {
-          type: 'object',
-          properties: {
-            victorias: { type: 'number' },
-            derrotas: { type: 'number' },
-            empates: { type: 'number' },
-            totalPartidas: { type: 'number' },
-          },
+          description: 'Introduce el token JWT en el formato: Bearer <token>',
         },
       },
     },
-    security: [{ bearerAuth: [] }],
+    security: [
+      {
+        bearerAuth: [],
+      },
+    ],
   },
-  apis: ['./src/routes/*.js'], // Scan route files for annotations
+  apis: ['./src/routes/*.js'],
 };
 
-const swaggerSpec = swaggerJsdoc(options);
+const swaggerSpec = swaggerJSDoc(options);
 
 const swaggerDocs = (app) => {
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
-  console.log('Swagger docs available at /api-docs');
 };
 
-module.exports = swaggerDocs;
+export default swaggerDocs;

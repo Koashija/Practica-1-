@@ -1,29 +1,21 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
+import jwt from 'jsonwebtoken';
 
-const protect = async (req, res, next) => {
-  let token;
+const authMiddleware = (req, res, next) => {
+  const authHeader = req.header('Authorization');
 
-  if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-    token = req.headers.authorization.split(' ')[1];
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ message: 'Acceso denegado. No se proporcionó un token Bearer válido.' });
   }
 
-  if (!token) {
-    return res.status(401).json({ message: 'Not authorized, no token' });
-  }
+  const token = authHeader.split(' ')[1];
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(decoded.id).select('-password');
-    if (!user) {
-      return res.status(401).json({ message: 'User not found' });
-    }
-    req.user = user;
+    req.user = decoded; 
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(401).json({ message: 'Not authorized, token failed' });
+    return res.status(401).json({ message: 'Token de autenticación inválido o expirado.' });
   }
 };
 
-module.exports = { protect };
+export default authMiddleware;

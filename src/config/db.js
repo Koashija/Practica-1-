@@ -2,11 +2,10 @@ import mongoose from 'mongoose';
 
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-
-    console.log('MongoDB conectado');
+    const dbConnection = await mongoose.connect(process.env.MONGODB_URI);
+    console.log(`Conexión exitosa a MongoDB Atlas: ${dbConnection.connection.host}`);
   } catch (error) {
-    console.error('MongoDB connection error:', error);
+    console.error(`Error crítico al conectar a la base de datos: ${error.message}`);
     process.exit(1);
   }
 };

@@ -1,73 +1,90 @@
-const express = require('express');
+import express from 'express';
+import { saveGame, getHistory, getStats } from '../controllers/game.controller.js';
+import authMiddleware from '../middlewares/auth.middleware.js';
+
 const router = express.Router();
-const { protect } = require('../middlewares/auth.middleware');
-const { saveGame, getHistory, getStats } = require('../controllers/game.controller');
-const { validateSaveGame } = require('../validators/game.validator');
+
+/**
+ * @swagger
+ * tags:
+ * name: Game
+ * description: Endpoints de almacenamiento y consulta de estadísticas de partidas.
+ */
 
 /**
  * @swagger
  * /api/game/save:
- *   post:
- *     summary: Save game result
- *     tags: [Game]
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - result
- *             properties:
- *               result:
- *                 type: string
- *                 enum: [victoria, derrota, empate]
- *     responses:
- *       201:
- *         description: Game saved
- *       400:
- *         description: Invalid result
+ * post:
+ * summary: Registra y almacena el resultado de una nueva partida jugada
+ * tags: [Game]
+ * security:
+ * - bearerAuth: []
+ * requestBody:
+ * required: true
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * required:
+ * - result
+ * properties:
+ * result:
+ * type: string
+ * enum: [victoria, derrota, empate]
+ * example: victoria
+ * responses:
+ * 201:
+ * description: Partida guardada perfectamente en el historial de la base de datos.
+ * 400:
+ * description: El resultado enviado no pertenece a los valores válidos admitidos.
+ * 401:
+ * description: Token inválido o autorización denegada.
  */
-router.post('/save', protect, validateSaveGame, saveGame);
+router.post('/save', authMiddleware, saveGame);
 
 /**
  * @swagger
  * /api/game/history:
- *   get:
- *     summary: Get user game history
- *     tags: [Game]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of games
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 $ref: '#/components/schemas/Game'
+ * get:
+ * summary: Obtiene el listado completo e histórico cronológico de partidas del usuario
+ * tags: [Game]
+ * security:
+ * - bearerAuth: []
+ * responses:
+ * 200:
+ * description: Listado devuelto ordenado desde el más reciente al más antiguo.
+ * 401:
+ * description: No autenticado.
  */
-router.get('/history', protect, getHistory);
+router.get('/history', authMiddleware, getHistory);
 
 /**
  * @swagger
  * /api/game/stats:
- *   get:
- *     summary: Get game statistics
- *     tags: [Game]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Statistics
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Stats'
+ * get:
+ * summary: Obtiene un objeto acumulativo con los totales de victorias, derrotas, empates y partidas totales
+ * tags: [Game]
+ * security:
+ * - bearerAuth: []
+ * responses:
+ * 200:
+ * description: Estadísticas calculadas devueltas de manera óptima.
+ * content:
+ * application/json:
+ * schema:
+ * type: object
+ * properties:
+ * victorias:
+ * type: integer
+ * derrotas:
+ * type: integer
+ * empates:
+ * type: integer
+ * totalPartidas:
+ * type: integer
+ * 401:
+ * description: Autenticación requerida.
  */
-router.get('/stats', protect, getStats);
+router.get('/stats', authMiddleware, getStats);
 
-module.exports = router;
+export default router;

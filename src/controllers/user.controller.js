@@ -1,59 +1,50 @@
-const User = require('../models/User');
+import User from '../models/User.js';
 
-// @desc    Get user profile
-// @route   GET /api/users/profile
-// @access  Private
-exports.getProfile = async (req, res, next) => {
+export const getProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: 'El perfil de usuario solicitado no existe.' });
     }
-    res.json(user);
+    return res.json(user);
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update user profile
-// @route   PUT /api/users/profile
-// @access  Private
-exports.updateProfile = async (req, res, next) => {
+export const updateProfile = async (req, res, next) => {
   try {
     const { username, email, avatar } = req.body;
-    const user = await User.findById(req.user.id);
 
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
+    if (email || username) {
+      const query = [];
+      if (email) query.push({ email });
+      if (username) query.push({ username });
 
-    // Check unique username/email if changed
-    if (username && username !== user.username) {
-      const existingUser = await User.findOne({ username });
+      const existingUser = await User.findOne({
+        $and: [
+          { _id: { $ne: req.user.id } },
+          { $or: query }
+        ]
+      });
+
       if (existingUser) {
-        return res.status(400).json({ message: 'Username already taken' });
+        return res.status(400).json({ message: 'El nombre de usuario o email ya se encuentra en uso.' });
       }
-      user.username = username;
     }
 
-    if (email && email !== user.email) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Email already in use' });
-      }
-      user.email = email;
-    }
+    const updatedFields = {};
+    if (username) updatedFields.username = username;
+    if (email) updatedFields.email = email;
+    if (avatar) updatedFields.avatar = avatar;
 
-    if (avatar) user.avatar = avatar;
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user.id,
+      { $set: updatedFields },
+      { new: true, runValidators: true }
+    ).select('-password');
 
-    await user.save();
-
-    res.json({
-      _id: user._id,
-      username: user.username,
-      email: user.email,
-      avatar: user.avatar,
-    });
+    return res.json(updatedUser);
   } catch (error) {
     next(error);
   }
